@@ -5,8 +5,7 @@ import User from "../models/User.js";
 export const inngest = new Inngest({id: "demogram"})
 
 const syncUserCreation = inngest.createFunction(
-    {id: 'sync-user-from-clerk'},
-    {event: 'clerk/user.created'},
+    {id: 'sync-user-from-clerk', triggers: {event: 'clerk/user.created'}},
     async ({event}) => {
         const {id, first_name, last_name, email_addresses, image_url} = event.data;
         let username = email_addresses[0].email_address.split('@')[0];
@@ -28,8 +27,7 @@ const syncUserCreation = inngest.createFunction(
     })
 
 const syncUserUpdate = inngest.createFunction(
-    {id: 'update-user-from-clerk'},
-    {event: 'clerk/user.updated'},
+    {id: 'update-user-from-clerk', triggers: {event: 'clerk/user.updated'}},
     async ({event}) => {
         const {id, first_name, last_name, email_addresses, image_url} = event.data;
 
@@ -44,8 +42,7 @@ const syncUserUpdate = inngest.createFunction(
     })
 
 const syncUserDeletion = inngest.createFunction(
-    {id: 'delete-user-with-clerk'},
-    {event: 'clerk/user.delete'},
+    {id: 'delete-user-with-clerk', triggers: {event: 'clerk/user.delete'}},
     async ({event}) => {
         const {id} = event.data;
         await User.findByIdAndDelete(id);
