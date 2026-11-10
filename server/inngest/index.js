@@ -2,79 +2,80 @@ import { Inngest } from "inngest";
 import User from "../models/User.js";
 import Connection from "../models/Connection.js";
 import sendEmail from "../configs/nodemailer.js";
+import Story from "../models/Story.js";
 // Create a client to send and receive events
 export const inngest = new Inngest({ id: "demogram" })
 
 const syncUserCreation = inngest.createFunction(
-    { id: 'sync-user-from-clerk', triggers: { event: 'clerk/user.created' } },
-    async ({ event }) => {
-        const { id, first_name, last_name, email_addresses, image_url } = event.data;
-        
-        if (!email_addresses || email_addresses.length === 0) {
-            throw new Error('No email addresses provided');
-        }
-        
-        let username = email_addresses[0].email_address.split('@')[0];
-        
-        // Generate unique username
-        let user = await User.findOne({ username });
-        let attempts = 0;
-        while (user && attempts < 10) {
-            username = username + Math.floor(Math.random() * 10000);
-            user = await User.findOne({ username });
-            attempts++;
-        }
-        
-        if (user) {
-            throw new Error('Could not generate unique username');
-        }
+  { id: 'sync-user-from-clerk', triggers: { event: 'clerk/user.created' } },
+  async ({ event }) => {
+    const { id, first_name, last_name, email_addresses, image_url } = event.data;
 
-        const userData = {
-            _id: id,
-            email: email_addresses[0].email_address,
-            full_name: `${first_name || ''} ${last_name || ''}`.trim() || 'User',
-            profile_picture: image_url,
-            username
-        }
-        await User.create(userData);
+    if (!email_addresses || email_addresses.length === 0) {
+      throw new Error('No email addresses provided');
+    }
 
-    })
+    let username = email_addresses[0].email_address.split('@')[0];
+
+    // Generate unique username
+    let user = await User.findOne({ username });
+    let attempts = 0;
+    while (user && attempts < 10) {
+      username = username + Math.floor(Math.random() * 10000);
+      user = await User.findOne({ username });
+      attempts++;
+    }
+
+    if (user) {
+      throw new Error('Could not generate unique username');
+    }
+
+    const userData = {
+      _id: id,
+      email: email_addresses[0].email_address,
+      full_name: `${first_name || ''} ${last_name || ''}`.trim() || 'User',
+      profile_picture: image_url,
+      username
+    }
+    await User.create(userData);
+
+  })
 
 const syncUserUpdate = inngest.createFunction(
-    { id: 'update-user-from-clerk', triggers: { event: 'clerk/user.updated' } },
-    async ({ event }) => {
-        const { id, first_name, last_name, email_addresses, image_url } = event.data;
+  { id: 'update-user-from-clerk', triggers: { event: 'clerk/user.updated' } },
+  async ({ event }) => {
+    const { id, first_name, last_name, email_addresses, image_url } = event.data;
 
-        const updateUserData = {
-            email: email_addresses?.[0]?.email_address,
-            full_name: `${first_name || ''} ${last_name || ''}`.trim() || 'User',
-            profile_picture: image_url
-        }
-        await User.findByIdAndUpdate(id, updateUserData);
+    const updateUserData = {
+      email: email_addresses?.[0]?.email_address,
+      full_name: `${first_name || ''} ${last_name || ''}`.trim() || 'User',
+      profile_picture: image_url
+    }
+    await User.findByIdAndUpdate(id, updateUserData);
 
 
-    })
+  })
 
 const syncUserDeletion = inngest.createFunction(
-    { id: 'delete-user-with-clerk', triggers: { event: 'clerk/user.delete' } },
-    async ({ event }) => {
-        const { id } = event.data;
-        await User.findByIdAndDelete(id);
-    })
+  { id: 'delete-user-with-clerk', triggers: { event: 'clerk/user.delete' } },
+  async ({ event }) => {
+    const { id } = event.data;
+    await User.findByIdAndDelete(id);
+  })
 
 const sendNewConnectionRequestReminder = inngest.createFunction(
-    { id: 'send-new-connection-request-reminder', triggers: { event: 'app/connection-request' } },
-    async ({ event, step }) => {
-        const { connectionId } = event.data;
-        await step.run('send-connection-request-email', async () => {
-            const connection = await Connection.findById(connectionId).populate('from_user_id').populate('to_user_id');
-            
-            if (!connection || !connection.from_user_id || !connection.to_user_id) {
-                return { message: 'Connection or users not found' };
-            }
-            
-            const subject = `New Connection Request`;
-            const body = `
+  { id: 'send-new-connection-request-reminder', triggers: { event: 'app/connection-request' } },
+  async ({ event, step }) => {
+    const { connectionId } = event.data;
+    await step.run('send-connection-request-email', async () => {
+      const connection = await Connection.findById(connectionId).populate('from_user_id').populate('to_user_id');
+
+      if (!connection || !connection.from_user_id || !connection.to_user_id) {
+        return { message: 'Connection or users not found' };
+      }
+
+      const subject = `New Connection Request`;
+      const body = `
 <body style="margin: 0; padding: 0; background-color: #000000; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; width: 100% !important;">
   <table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; background-color: #000000;">
     <tr>
@@ -132,25 +133,25 @@ const sendNewConnectionRequestReminder = inngest.createFunction(
   </table>
 </body>
             `;
-            await sendEmail({ to: connection.to_user_id.email, subject, body });
-        })
+      await sendEmail({ to: connection.to_user_id.email, subject, body });
+    })
 
 
-        const in24Hours = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        await step.sleepUntil('wait-for-24-hours', in24Hours);
-        await step.run('send-connection-request-reminder', async () => {
-            const connection = await Connection.findById(connectionId).populate('from_user_id').populate('to_user_id');
+    const in24Hours = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await step.sleepUntil('wait-for-24-hours', in24Hours);
+    await step.run('send-connection-request-reminder', async () => {
+      const connection = await Connection.findById(connectionId).populate('from_user_id').populate('to_user_id');
 
-            if (!connection || !connection.from_user_id || !connection.to_user_id) {
-                return { message: 'Connection or users not found' };
-            }
+      if (!connection || !connection.from_user_id || !connection.to_user_id) {
+        return { message: 'Connection or users not found' };
+      }
 
-            if (connection.status === 'accepted') {
-                return { message: 'Connection request already accepted, no reminder sent.' };
-            }
+      if (connection.status === 'accepted') {
+        return { message: 'Connection request already accepted, no reminder sent.' };
+      }
 
-            const subject = `New Connection Request Reminder`;
-            const body = `
+      const subject = `New Connection Request Reminder`;
+      const body = `
 <body style="margin: 0; padding: 0; background-color: #000000; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; width: 100% !important;">
   <table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; background-color: #000000;">
     <tr>
@@ -209,14 +210,29 @@ const sendNewConnectionRequestReminder = inngest.createFunction(
 </body>
             `;
 
-            await sendEmail({ to: connection.to_user_id.email, subject, body });
-        })
+      await sendEmail({ to: connection.to_user_id.email, subject, body });
+    })
 
-        return { message: 'Connection request reminder sent after 24 hours.' };
-    }
+    return { message: 'Connection request reminder sent after 24 hours.' };
+  }
 );
 
+// Inngest function to delete the story after 24 hours of creation
+const deleteStory = inngest.createFunction({
+  id: 'story-delete'
+},
+  { event: 'app/story.delete' },
+  async ({ event, step }) => {
+    const { storyId } = event.data;
+    const in24Hours = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await step.sleepUntil('wait-for-24-hours', in24Hours);
+    await step.run('delete-story', async () => {
+      await Story.findByIdAndDelete(storyId);
+      return { message: "Story deleted." }
+    })
+  }
+);
 // Create an empty array where we'll export future Inngest functions
 export const functions = [
-    syncUserCreation, syncUserUpdate, syncUserDeletion, sendNewConnectionRequestReminder
+  syncUserCreation, syncUserUpdate, syncUserDeletion, sendNewConnectionRequestReminder, deleteStory
 ];
