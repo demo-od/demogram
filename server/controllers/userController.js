@@ -132,7 +132,7 @@ export async function followUser(req, res) {
 
         const toUser = await User.findById(id);
         toUser.followers.push(userId);
-        await touser.save();
+        await toUser.save();
 
         res.json({ success: true, message: 'You are now following this user' });
 
@@ -208,7 +208,8 @@ export async function sendConnectionRequest(req, res) {
     }
 
     catch (error) {
-
+        console.log(error);
+        return res.json({ success: false, message: error.message });
     }
 }
 
@@ -232,7 +233,7 @@ export async function acceptConnectionRequest(req, res) {
     try {
         const { userId } = req.auth();
         const { id } = req.body;
-        const connection = await Connection.findOne({ from_user_id: id, to_user_id: userId }, { status: "accepted" });
+        const connection = await Connection.findOne({ from_user_id: id, to_user_id: userId, status: "pending" });
 
         if (!connection) {
             return res.json({ success: false, message: "Connection request not found" });
